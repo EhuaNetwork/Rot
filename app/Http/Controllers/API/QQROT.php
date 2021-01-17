@@ -158,12 +158,10 @@ class QQROT
             $this->data = json_decode($json, true);
         } else {
             //格式转换
-            $json= request()->input();
-
-            DB::table('log')->insert(['datetime'=>date('Y-m-d H:i:s',time()),'body'=>$json['Type']]);
-die;
-//            $json = array_keys(request()->all())[0];
-//            $json = stripslashes($json);
+//            $json= request()->input();
+//            DB::table('log')->insert(['datetime'=>date('Y-m-d H:i:s',time()),'body'=>$json['Type']]);
+            $json = array_keys(request()->all())[0];
+            $json = stripslashes($json);
             file_put_contents('1.json', $json);
             file_put_contents('1.1.json', json_encode(request()->all(), 256));
             $this->data = json_decode($json, true);
@@ -199,8 +197,6 @@ die;
             \QQROT\QQROT::setGroupAddRequest($this->qun, $this->qq, $seq, 11, 1);
             return true;
         }
-        file_put_contents('no.txt', $this->data['Msg']['Text']);
-die;
         //验证群权限
         $authres = $this->auth_qun();
         if (!$authres) {

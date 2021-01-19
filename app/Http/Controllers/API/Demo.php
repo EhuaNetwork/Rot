@@ -4,13 +4,15 @@
 namespace App\Http\Controllers\API;
 
 
+use Illuminate\Support\Facades\DB;
+
 class Demo
 {
     public function init(){
-        $a=1;
-        $b=2;
-        $c=$a+$b;
-        echo 1;
+        \QQROT\QQROT::init(config('QQROT.qq'), config('QQROT.ip'), config('QQROT.port'), config('QQROT.pass'));
+
+        $res=\QQROT\QQROT::getGroupList();
+        dd($res);die;
     }
 }
 

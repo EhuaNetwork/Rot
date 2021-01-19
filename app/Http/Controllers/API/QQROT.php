@@ -99,8 +99,13 @@ class QQROT
 {
     public $data;
     public $qun;
+    public $qunKey;//授权群 关键词
+
+
+    public $type;//信息类型  群、好友
     public $qq;
     public $key;//请求关键词
+
     public $startKey;//请求关键词
     public $endKey; //请求关键词
 
@@ -153,103 +158,125 @@ class QQROT
                }
            }
         */
-        if (request()->has('bool')) {
+        if (request()->has('bool')) {//调试模式
             $json = file_get_contents('1.json');
             $this->data = json_decode($json, true);
         } else {
-            //格式转换
-//            $json= request()->input();
-//            DB::table('log')->insert(['datetime'=>date('Y-m-d H:i:s',time()),'body'=>$json['Type']]);
+
             $json = array_keys(request()->all())[0];
             $json = stripslashes($json);
-            file_put_contents('1.json', $json);
-            file_put_contents('1.1.json', json_encode(request()->all(), 256));
+            //强制换格式
+            $json = str_replace("<?xml_version\":\"\'1.0\' encoding=\'UTF-8\' standalone=\'yes\' ?>", "", $json);
+
             $this->data = json_decode($json, true);
+            if (preg_match("/.*xml_version.*/", $json)) {
+                $this->data = [];
+            }//xml强制为空
+            if (empty($this->data)) {
+                $json = json_encode(request()->all(), 256);
+//                DB::table('log')->insert(['datetime' => date('Y-m-d H:i:s', time()), 'body' => $json]);
+
+                $json = stripslashes($json);
+                //强制换格式
+                $json = str_replace("\"_file,fileId\":\"", "\"_file,fileId\\\":\\\"", $json);
+                $json = str_replace("<?xml_version\":\"\'1.0\' encoding=\'UTF-8\' standalone=\'yes\' ?>", "", $json);
+
+
+                $json = trim($json, '{');
+                $json = trim($json, '}');
+                $json = trim($json, '"');
+                file_put_contents('11.txt', $json);
+                DB::table('log')->insert(['body' => $json]);
+
+                $this->data = json_decode($json, true);
+//                DB::table('log')->insert(['body' => 'run out']);
+            }
+            if (empty($this->data)) {
+                DB::table('log')->insert(['body' => 'data is null']);
+                return;
+            }
         }
 
         //初始化
         $this->qq = $this->data['FromQQ']['UIN'];
         $this->qun = $this->data['FromGroup']['GIN'];
         $this->key = $this->data['Msg']['Text'];
+        $this->type = $this->data['Type'];
+        $qunKey = DB::table('q_auth_qun')->where('qun', $this->qun)->value('key');
+
+
+        if ($this->qq == config('QQROT.qq')) {
+            return;
+        }//调过自己的消息
         \QQROT\QQROT::init(config('QQROT.qq'), config('QQROT.ip'), config('QQROT.port'), config('QQROT.pass'));
 
+        if ($this->key == '测试') {
+            \QQROT\QQROT::sendGroupMsg($this->qun, 'Success!', $anonymous = false, 'str');//给群：12345 发消息
+        }
 
+
+        //监控
+        switch ($this->type) {
+            case 'PrivateMsg'://好友信息
+                QQROT_CHECK::groupshare($this->key, $this->qq);//群邀请自动同意监控
+                break;
+            case 'GroupMsg':
+                QQROT_CHECK::monitoringMsg($this->key, $this->qun, $this->qq);//群信息采集监控
+                QQROT_CHECK::groupMsgshare($this->key, $this->qun, 'die');//群消息转发监控（群文件）
+                break;
+        }
+        if (empty($qunKey)) { die; }//群未授权 die
+        $this->qunKey = explode(',', $qunKey);
+
+        //菜单命令监控（优先）
+        QQROT_CHECK::groupMenu($this->key, $this->qun, $this->qunKey, 'die');
     }
 
     public function Run()
     {
 //   <?xml version='1.0' encoding='UTF-8' standalone='yes' <!--<msg serviceID="128" templateID="12345" action="native" brief="[链接]邀请你加入群聊" sourceMsgId="0" url=""><item //layout="2"><picture cover=""/><title>邀请你加入群聊</title><summary /></item><data groupcode="953540518" groupname="小狼狗" msgseq="1610834617813036" msgtype="2"/></msg>
-        //主人邀请自动同意进群
-        if (preg_match("/.*邀请你加入群聊.*/", $this->data['Msg']['Text'])) {
-            file_put_contents('ok.txt', $this->data['Msg']['Text']);
-            preg_match("/groupcode=\"\d+\"/", $this->data['Msg']['Text'], $requn);
-            $this->qun = trim(str_replace("groupcode=\"", '', $requn[0]), '\"');
-
-            preg_match("/msgseq=\"\d+\"/", $this->data['Msg']['Text'], $requn);
-            $seq = trim(str_replace("msgseq=\"", '', $requn[0]), '\"');
 
 
-            file_put_contents('demo1.txt',$this->qun);
-            file_put_contents('demo2.txt',$this->qq);
-            file_put_contents('demo3.txt',$this->seq);
+        switch ($this->type) {
+            case 'PrivateMsg'://好友信息
 
 
-            \QQROT\QQROT::setGroupAddRequest($this->qun, $this->qq, $seq, 11, 1);
-            return true;
+                break;
+            case 'GroupMsg'://群消息
+
+                //一 匹配库内关键词
+                $res = $this->is_keyall($this->key, $ids = $this->qunKey);//判断是否为全索引指令
+                if (empty($res)) {
+                    $res = $this->getkey($this->key, 5, $ids = $this->qunKey);
+                }
+
+                if (empty($res)) {
+                    return $this->put_error('No keyword is matched');
+                }//无匹配则返回
+                $res = $res->toarray();
+
+                // 查询关键词对应操作
+                $CONFIG = Qcfg::where(['id' => $res['config_id']])->first();
+                if (empty($CONFIG)) {
+                    return $this->put_error('No configuration');
+                }
+                $CONFIG = $CONFIG->toarray();
+
+
+                //二 逻辑处理 判断是否含有特殊事件标签
+                $this->authority_labe($res);
+
+                //三 逻辑处理 输出格式处理 针对配置替换内容
+                $this->authority_type($CONFIG);
+
+                //四 输出执行操作
+                return $this->put_success($this->qq, $CONFIG['type']);
+
+
+                break;
         }
-        //验证群权限
-        $authres = $this->auth_qun();
-        if (!$authres) {
-            return false;
-        } else {
-            $authres = $authres[0];
-        }
-
-
-        //一 匹配库内关键词
-        $res = $this->is_keyall($this->key, $ids = $authres['key']);//判断是否为全索引指令
-        if (empty($res)) {
-            $res = $this->getkey($this->key, 5, $ids = $authres['key']);
-        }
-
-        if (empty($res)) {
-            return $this->put_error('No keyword is matched');
-        }//无匹配则返回
-        $res = $res->toarray();
-
-        // 查询关键词对应操作
-        $CONFIG = Qcfg::where(['id' => $res['config_id']])->first();
-        if (empty($CONFIG)) {
-            return $this->put_error('No configuration');
-        }
-        $CONFIG = $CONFIG->toarray();
-
-
-        //二 逻辑处理 判断是否含有特殊事件标签
-        $this->authority_labe($res);
-
-        //三 逻辑处理 输出格式处理 针对配置替换内容
-        $this->authority_type($CONFIG);
-
-        //四 输出执行操作
-        return $this->put_success($this->qq, $CONFIG['type']);
     }
 
-    public function auth_qun()
-    {
-        //验证群权限
-        if ($this->qun > 0) {
-            $res = DB::table('q_auth_qun')->where('qun', $this->qun)->get();
-            if ($res) {
-                $data = json_encode($res, 256);
-                $data = json_decode($data, true);
-                return $data;
-            } else {
-                return false;
-            }
-        }
-        return true;
-    }
 
     /**
      * 判断是否包含官方标签 进行特殊逻辑输出
@@ -344,6 +371,29 @@ class QQROT
                 $this->str = "{$temp['artistsname']}|{$temp['url']}|{$temp['url']}|{$temp['picurl']}|EHUA ROT|{$temp['name']}|{$temp['name']}";
                 $this->img = '';
                 break;
+            case 'csgokey'://csgo在线开黑
+                $time = time() - 60 * 5;
+                $res = DB::table('made_csgo')
+                    ->where('intime', '>', date('Y-m-d H:i:s', $time))
+                    ->limit(10)
+                    ->orderBy('intime', 'desc')->get();
+                $res = json_encode($res, 256);
+                $res = json_decode($res, true);
+
+                $str = "";
+                foreach ($res as $k) {
+                    $str .= $k['qq'] . '--' . $k['key'] . "\n";
+                }
+                if ($str == '') {
+                    $str = "暂无";
+                } else {
+                    $str = "近5分钟内的开黑信息\n" . $str;
+                }
+
+                $this->json = "$str|{$str}|{$str}|{$str}|EHUA ROT|信息分享|信息分享";
+                $this->str = $str;
+                $this->img = $str;
+                break;
             default:
                 $this->json = $res['content'];
                 $this->str = $res['content'];
@@ -420,7 +470,7 @@ class QQROT
     private function is_keyall($key, $ids)
     {
         $res = Qkey::where('key', $key);
-        $res = $res->whereIn('id', explode(',', $ids));
+        $res = $res->whereIn('id',$ids);
         $res = $res->first();
         return $res;
     }
@@ -428,7 +478,7 @@ class QQROT
     private function is_keylike($key, $ids)
     {
         $res = Qkey::where('key', 'like', $key);
-        $res = $res->whereIn('id', explode(',', $ids));
+        $res = $res->whereIn('id', $ids);
         $res = $res->first();
         return $res;
     }

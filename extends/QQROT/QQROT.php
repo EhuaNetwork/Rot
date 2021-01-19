@@ -387,7 +387,7 @@ class QQROT
         $postData = array('logonqq' => self::$logonqq);
         $result = self::sendRequest('getgrouplist', $postData);
         $result = json_decode($result, true);
-        return $result['ret'];
+        return $result;
     }
 
     /**

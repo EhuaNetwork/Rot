@@ -14,8 +14,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::any('/', function () {
-    $a=file_put_contents('./1.json',json_encode($_POST));
-    var_dump($a);die;
+   echo 1;
 });
 
 //Route::any('/demo',function (){

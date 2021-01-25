@@ -837,6 +837,14 @@ class QQROT
         return $result['ret'];
     }
 
+    static function getgrouphb(){
+        $postData = array('fromqq' => self::$logonqq, 'group' => '511476741','folder'=>'v3');
+        $result = self::sendRequest('getgroupfilelist', $postData);
+        dd($result);
+        $result = json_decode($result, true);
+        return $result;
+    }
+
 
     /**
      * 获取skey
@@ -911,5 +919,6 @@ class QQROT
         curl_close($curl);
         return $tmpInfo;
     }
+
 
 }

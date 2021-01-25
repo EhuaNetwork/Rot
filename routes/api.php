@@ -20,7 +20,14 @@ Route::group(['middleware' => 'VideoVerify'], function () {
 
 });
 Route::any('qqrot', 'API\QQROT@run');
-Route::any('task', 'API\Task@run');
+Route::any('qqrot2', 'API\QQROT2@run');
+
+
+
+Route::any('guanggao', 'API\Task@guanggao');
+Route::any('check_file', 'API\Task@check_file');
+
+
 
 Route::any('wxrot', 'API\WXROT@run');
 

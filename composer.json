@@ -40,6 +40,7 @@
             "database/seeds",
             "database/factories",
             "extends/QQROT/QQROT.php",
+            "extends/QQROT/QQROT2.php",
             "extends/WXROT/WXROT.php"
         ],
         "files": [

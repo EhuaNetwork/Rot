@@ -67,7 +67,7 @@ class QQROT_CHECK
      * @author Ehua(ehua999@163.com)
      * @date 2021/1/18 6:44
      */
-    public static function groupMsgshare($key, $qun, $die)
+    public static function groupMsgshare($key, $qun,$qq, $die)
     {
 
         if (preg_match("/.*?_file,fileId.*?/", $key)) {
@@ -91,10 +91,9 @@ class QQROT_CHECK
             preg_match("/,fileName=.*?,fileSize/", $key, $requn);
             $fileName = trim(str_replace(",fileName=", '', $requn[0]), ',fileSize');
 
-            DB::table('log')->insert(['body' => '文件转发完毕']);
+            DB::table('q_share_log')->insert(['qun' =>$qun,'file_id'=>$fileId,'file_name'=>$fileName,'qq'=>$qq]);
 
-            \QQROT\QQROT::forwardFile(0, $qun, $res['to_qun'], $fileId, $fileName);
-
+            \QQROT\QQROT2::forwardFile($qun, $res['to_qun'],$fileId);
             if ($die == 'die') {
                 die;
             }
@@ -130,7 +129,7 @@ class QQROT_CHECK
             foreach ($res2 as $k) {
                 $str .= $k['key'] ."\n";
             }
-            \QQROT\QQROT::sendGroupMsg($qun, $str, $anonymous = false, 'str');//给群：12345 发消息
+            \QQROT\QQROT2::sendGroupMsg($qun,$str,false);
             if (!empty($res) && $die == 'die') {
                 die;
             }

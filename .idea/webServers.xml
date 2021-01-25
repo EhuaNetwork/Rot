@@ -9,6 +9,13 @@
           </advancedOptions>
         </fileTransfer>
       </webServer>
+      <webServer id="bd584a4e-d87b-4359-8e6b-cacecff7f70e" name="103.151.217.29" url="http://103.151.217.29">
+        <fileTransfer host="103.151.217.29" port="21">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
     </option>
   </component>
 </project>

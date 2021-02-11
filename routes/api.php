@@ -25,7 +25,7 @@ Route::any('qqrot2', 'API\QQROT2@run');
 
 
 Route::any('guanggao', 'API\Task@guanggao');
-Route::any('check_file', 'API\Task@check_file');
+Route::any('check_file/{qun}', 'API\Task@check_file');
 
 
 

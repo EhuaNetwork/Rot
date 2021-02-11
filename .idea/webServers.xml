@@ -2,15 +2,8 @@
 <project version="4">
   <component name="WebServers">
     <option name="servers">
-      <webServer id="d38a99bf-93a3-490a-83f9-4513d8cb43c8" name="rot" url="http://rot.ehua.pro">
-        <fileTransfer host="47.93.232.49" port="21">
-          <advancedOptions>
-            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
-          </advancedOptions>
-        </fileTransfer>
-      </webServer>
-      <webServer id="bd584a4e-d87b-4359-8e6b-cacecff7f70e" name="103.151.217.29" url="http://103.151.217.29">
-        <fileTransfer host="103.151.217.29" port="21">
+      <webServer id="515c297d-ddbc-4de4-b7e6-9751f0416f26" name="rot" url="http://81.70.163.170">
+        <fileTransfer host="81.70.163.170" port="21">
           <advancedOptions>
             <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
           </advancedOptions>

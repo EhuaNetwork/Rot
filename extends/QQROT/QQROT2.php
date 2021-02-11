@@ -55,6 +55,18 @@ class QQROT2
         return self::parseResult($result);
     }
 
+    static function upload_group_image($togroup, $flash, $pic)
+    {
+        $postData = [
+            'bot' => self::$logonqq,
+            'group' => $togroup,
+            'flash' => $flash,
+            'pic' => $pic,
+        ];
+        $result = self::sendRequest('upload_group_image', $postData);
+        return self::parseResult($result);
+    }
+
     /**
      * 发送好友消息
      * @param number $toqq 指定qq
@@ -108,7 +120,7 @@ class QQROT2
      * @author Ehua(ehua999@163.com)
      * @date 2021/1/19 23:51
      */
-    static function set_group_add_request($group, $qq, $id,$handle, $event, $reason)
+    static function set_group_add_request($group, $qq, $id, $handle, $event, $reason)
     {
         $postData = [
             'bot' => self::$logonqq,
@@ -122,7 +134,9 @@ class QQROT2
         $result = self::sendRequest('set_group_add_request', $postData);
         return self::parseResult($result);
     }
-    static function send_group_hb($type,$num,$money,$group,$text,$pass,$id,$skin,$qq,$average){
+
+    static function send_group_hb($type, $num, $money, $group, $text, $pass, $id, $skin, $qq, $average)
+    {
         $postData = [
             'bot' => self::$logonqq,
             'type' => $type,
@@ -137,7 +151,6 @@ class QQROT2
             'average' => $average,
         ];
         $result = self::sendRequest('send_group_hb', $postData);
-        dd($result);
         return self::parseResult($result);
     }
 
@@ -186,41 +199,163 @@ class QQROT2
      * @author Ehua(ehua999@163.com)
      * @date 2021/1/21 13:18
      */
-    static function move_group_file($qun,$fileId,$formath,$topath){
+    static function move_group_file($qun, $fileId, $formath, $topath)
+    {
         $postData = [
             'bot' => self::$logonqq,
             'group' => $qun,
             'fileid' => $fileId,
             'from' => $formath,
-            'to' =>$topath,
+            'to' => $topath,
         ];
         $result = self::sendRequest('move_group_file', $postData);
         return self::parseResult($result);
     }
 
+    /**
+     * 获取管理员列表
+     * @param $qun
+     * @return bool|mixed
+     * @author Ehua(ehua999@163.com)
+     * @date 2021/2/9 8:59
+     */
+    static function get_group_admin($qun)
+    {
+        $postData = [
+            'bot' => self::$logonqq,
+            'group' => $qun,
+        ];
+        $result = self::sendRequest('get_group_admin', $postData);
+        return self::parseResult($result);
+    }
+
+    /**
+     * T出群员
+     * @param $qun
+     * @param $qq
+     * @param bool $block
+     * @return bool|mixed
+     * @author Ehua(ehua999@163.com)
+     * @date 2021/2/9 9:00
+     */
+    static function delete_member($qun, $qq, $block = false)
+    {
+        $postData = [
+            'bot' => self::$logonqq,
+            'group' => $qun,
+            'qq' => $qq,
+            'block' => $block,
+        ];
+        $result = self::sendRequest('delete_member', $postData);
+        return self::parseResult($result);
+    }
+
+    /**
+     * 禁言
+     * @param $qun
+     * @param $qq
+     * @param bool $block
+     * @return bool|mixed
+     * @author Ehua(ehua999@163.com)
+     * @date 2021/2/9 9:00
+     */
+    static function ban($qun, $qq, $time = 60)
+    {
+        $postData = [
+            'bot' => self::$logonqq,
+            'group' => $qun,
+            'qq' => $qq,
+            'time' => $time,
+        ];
+        $result = self::sendRequest('ban', $postData);
+        return self::parseResult($result);
+    }
 
 
+    static function set_group_notice($qun, $title, $content, $pic = '', $video = '', $popup = true, $confirm = false, $top = false, $new = false, $card = false)
+    {
+        $postData = [
+            'bot' => self::$logonqq,
+            'group' => $qun,
+            'title' => $title,
+            'content' => $content,
+            'pic' => $pic,
+            'video' => $video,
+            'popup' => $popup,
+            'confirm' => $confirm,
+            'top' => $top,
+            'new' => $new,
+            'card' => $card,
+        ];
+        $result = self::sendRequest('set_group_notice', $postData);
+        return self::parseResult($result);
+    }
 
 
+    static function set_group_admin($qun, $qq, $cancel)
+    {
+        $postData = [
+            'bot' => self::$logonqq,
+            'group' => $qun,
+            'qq' => $qq,
+            'cancel' => $cancel,
+        ];
+        $result = self::sendRequest('set_group_admin', $postData);
+        return self::parseResult($result);
+    }
 
 
+    static function mute($qun, $enable)
+    {
+        $postData = [
+            'bot' => self::$logonqq,
+            'group' => $qun,
+            'enable' => $enable,
+        ];
+        $result = self::sendRequest('mute', $postData);
+        return self::parseResult($result);
+    }
 
+    /**
+     * 群信息
+     * @param $qun
+     * @param $enable
+     * @return bool|mixed
+     * @author Ehua(ehua999@163.com)
+     * @date 2021/2/9 19:51
+     */
+    static function get_group_info($qun)
+    {
+        $postData = [
+            'bot' => self::$logonqq,
+            'group' => $qun,
+        ];
+        $result = self::sendRequest('get_group_info', $postData);
+        return self::parseResult($result);
+    }
 
-
-
-
-
-
-
-
+    static function add_group($qun, $msg)
+    {
+        $postData = [
+            'bot' => self::$logonqq,
+            'group' => $qun,
+            'msg' => $msg,
+        ];
+        $result = self::sendRequest('add_group', $postData);
+        return self::parseResult($result);
+    }
 
 
     static function parseResult($result)
     {
+        $result = x162($result);
         $data = json_decode($result, 1);
         if ($data['code'] == 0) {
             if (isset($data['data'])) {
                 return $data['data'];
+            }
+            if (isset($data['msg'])) {
+                return $data['msg'];
             }
             return true;
         } else {

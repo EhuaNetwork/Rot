@@ -6,8 +6,10 @@ namespace App\Http\Controllers\API;
 
 use App\Models\ROT\Qcfg;
 use App\Models\ROT\Qkey;
+use App\Models\ROT\Qkey_Boss;
 use GuzzleHttp;
 use Illuminate\Support\Facades\DB;
+use PhpParser\Node\Stmt\DeclareDeclare;
 
 
 class QQROT2
@@ -58,9 +60,13 @@ class QQROT2
 
         if (request()->has('bool')) {//调试模式
             $json = file_get_contents('1.json');
+//            $json = str_replace("0\\x11\\x10", '', $json);
             $this->data = json_decode($json, true);
         } else {
-            $json = json_encode(request()->all(), 256);
+            $json = request()->all();
+            $json = x16($json);
+            $json = json_encode($json, 256);
+
             DB::table('log')->insert(['datetime' => date('Y-m-d H:i:s', time()), 'body' => $json]);
             $this->data = json_decode($json, true);
             if (empty($this->data)) {
@@ -68,18 +74,20 @@ class QQROT2
                 return;
             }
         }
-
-        $bossqq = '3135491919';
-
         //初始化
         $this->qq = empty($this->data['sender']['id']) ? $this->data['trigger']['id'] : $this->data['sender']['id'];
-//        if ($this->qq != $bossqq) {
-//            return false;
-//        } else {
-//            $bool1 = 1;
-//        }
+        if (DB::table('q_system')->where(['value' => 1, 'key' => 'Status'])->count() != 0) {
+            $bossqq = DB::table('q_system')->where(['key' => 'Boos'])->first();
+            $bossqq = json_encode($bossqq, 256);
+            $bossqq = json_decode($bossqq, true);
+            $new_arr = explode(',', $bossqq['value']);
+            if (!in_array($this->qq, $new_arr)) {
+                return false;
+            } else {
+                $bool1 = 1;
+            }
+        }
         file_put_contents('1.json', $json);
-
 
         $this->qun = @$this->data['group']['id'];
         $this->key = $this->data['message']['text'];
@@ -92,8 +100,8 @@ class QQROT2
         $quninfo = json_decode($quninfo, true);
 
         \QQROT\QQROT2::init(config('QQROT.qq'), config('QQROT.ip'), (config('QQROT.port') + 1), config('QQROT.pass'));
-        if (isset($bool1)) {
-            $RES = \QQROT\QQROT2::send_friend_msg($bossqq, '当前为调试模式');
+        if (!empty($bool1)) {
+            $RES = \QQROT\QQROT2::send_friend_msg('3135491919', '当前为调试模式');
         }
 
         if ($this->qq == config('QQROT.qq')) {
@@ -101,6 +109,14 @@ class QQROT2
         }//跳过自己消息
         if ($this->key == '测试') {
             \QQROT\QQROT2::send_group_msg($this->qun, 'Success!', $anonymous = false);
+        }
+        if ($this->qun == '1072639978') {
+            return false;
+            die;
+        }
+        if ($this->qq == '2854196310') {
+            return false;
+            die;
         }
 
 
@@ -112,23 +128,27 @@ class QQROT2
 
                 break;
             case 'private'://好友信息
-                QQROT_CHECK2::groupshare($this->key, $this->qq,$this->data['message']['id']);//群邀请自动同意监控
+
+                QQROT_CHECK2::groupshare($this->key, $this->qq, $this->data['message']['id']);//群邀请自动同意监控
 //                QQROT_CHECK2::groupshareHe($this->key, $this->qq,$this->data['message']['id']);//群邀请自动同意监控
-                QQROT_CHECK2::groupadd2($this->key, $this->qq,'die');//加群处理2
+                QQROT_CHECK2::groupadd2($this->key, $this->qq, 'die');//加群处理2
                 break;
             case 'group':
+                //主人授权命令
+                $this->boosCommand();
+                T_yunhei::yunhei($this->key, $this->qun, $this->qq);//云黑
+                T_csgo::csgopub($this->key, $this->qun);//csgo小功能
+                T_Qbang::Qbang($this->key, $this->qun);//查Q绑
+                T_mm::mm($this->key, $this->qun);//营养快线
+                T_admin::init($this->key, $this->qun, $this->qq);
+
+//                T_MsgRot::MsgRot($this->key,$this->qun);//聊天机器人
 
                 QQROT_CHECK2::monitoringMsg($this->key, $this->qun, $this->qq);//群信息采集监控
-//                DB::table('log')->insert(['body'=>1]);
-
                 QQROT_CHECK2::groupMsgshare($this->key, $this->qun, $this->qq, 'die');//群消息转发监控（群文件）
-//                DB::table('log')->insert(['body'=>2]);
-
                 break;
         }
 
-        //主人授权命令
-        QQROT_CHECK2::boosCommand($this->key, $quninfo, $this->qun, $this->qq, $bossqq, 'die');
 
         if (empty($quninfo)) {
             die;
@@ -141,18 +161,14 @@ class QQROT2
 
     }
 
+
     public function Run()
     {
 //   <?xml version='1.0' encoding='UTF-8' standalone='yes' <!--<msg serviceID="128" templateID="12345" action="native" brief="[链接]邀请你加入群聊" sourceMsgId="0" url=""><item //layout="2"><picture cover=""/><title>邀请你加入群聊</title><summary /></item><data groupcode="953540518" groupname="小狼狗" msgseq="1610834617813036" msgtype="2"/></msg>
-
-
         switch ($this->subtype) {
             case 'private'://好友信息
-
-
                 break;
             case 'group'://群消息
-
                 //一 匹配库内关键词
                 $res = $this->is_keyall($this->key, $ids = $this->qunKey);//判断是否为全索引指令
                 if (empty($res)) {
@@ -190,6 +206,55 @@ class QQROT2
 
 
     /**
+     * 主人命令
+     * @return \Illuminate\Http\JsonResponse|void
+     * @author Ehua(ehua999@163.com)
+     * @date 2021/1/28 17:17
+     */
+    public function boosCommand()
+    {
+        switch ($this->subtype) {
+            case 'private'://好友信息
+
+
+                break;
+            case 'group'://群消息
+
+                //一 匹配库内关键词
+                $res = $this->is_keyall_boss($this->key, $ids = $this->qunKey);//判断是否为全索引指令
+                if (empty($res)) {
+                    $res = $this->getkey_boss($this->key, 5, $ids = $this->qunKey);
+                }
+                if (empty($res)) {
+                    return false;//todo 无主人指令
+                }//无匹配则返回
+                $res = $res->toarray();
+
+
+                // 查询关键词对应操作
+                $CONFIG = Qcfg::where(['id' => $res['config_id']])->first();
+                if (empty($CONFIG)) {
+                    return $this->put_error('No configuration');
+                }
+                $CONFIG = $CONFIG->toarray();
+
+
+                //二 逻辑处理 判断是否含有特殊事件标签
+                $this->authority_labe_boss($res);
+
+                //三 逻辑处理 输出格式处理 针对配置替换内容
+                $this->authority_type($CONFIG);
+
+                //四 输出执行操作
+                return $this->put_success($this->qq, $CONFIG['type']);
+
+
+                break;
+        }
+    }
+//=====================================================================================================================
+
+    /**
      * 判断是否包含官方标签 进行特殊逻辑输出
      * @param $res
      * @author Ehua(ehua999@163.com)
@@ -201,15 +266,15 @@ class QQROT2
             case 'search3'://GET搜索
                 $content = explode('|', $res['content']);
                 foreach ($content as $kk => $k) {
-//                    $arr = $this->guzz('http://url.ehua.pro/api.php?url=' . $k . urlencode($this->endKey));
-//                    $arr = json_decode($arr, true);
-//                    if (!empty($arr["error"])) {
-//                        $str[] = '结果' . ($kk + 1) . ':' . $arr['err'];
-//                    } else {
-//                        $str[] = '结果' . ($kk + 1) . ':' . $arr['url'];
-//                    }
+                    $arr = guzz('http://url.ehua.pro/api.php?url=' . $k . urlencode($this->endKey));
+                    $arr = json_decode($arr, true);
+                    if (!empty($arr["error"])) {
+                        $str[] = '结果' . ($kk + 1) . ':' . $arr['error'];
+                    } else {
+                        $str[] = '结果' . ($kk + 1) . ':' . $arr['shorturl'];
+                    }
 
-                    $str[] = '结果' . ($kk + 1) . ':' . $k . urlencode($this->endKey);
+//                    $str[] = '结果' . ($kk + 1) . ':' . $k . urlencode($this->endKey);
                 }
                 $str = '查询结果：
 
@@ -280,23 +345,7 @@ class QQROT2
                 $this->img = '';
                 break;
             case 'csgokey'://csgo在线开黑
-                $time = time() - 60 * 5;
-                $res = DB::table('made_csgo')
-                    ->where('intime', '>', date('Y-m-d H:i:s', $time))
-                    ->limit(20)
-                    ->orderBy('intime', 'desc')->get();
-                $res = json_encode($res, 256);
-                $res = json_decode($res, true);
-
-                $str = "";
-                foreach ($res as $k) {
-                    $str .= $k['qq'] . '--' . $k['key'] . "\n";
-                }
-                if ($str == '') {
-                    $str = "暂无";
-                } else {
-                    $str = "近5分钟内的开黑信息\n" . $str;
-                }
+                $str = T_csgo::csgokey();
 
                 $this->json = "$str|{$str}|{$str}|{$str}|EHUA ROT|信息分享|信息分享";
                 $this->str = $str;
@@ -311,6 +360,7 @@ class QQROT2
 
 
     }
+
 
     /**
      * 输出格式处理 针对配置替换内容
@@ -393,6 +443,136 @@ class QQROT2
         return $res;
     }
 
+//============================================================================================================
+
+    /**
+     * 匹配是否为like关键词
+     * @param $key
+     * @param int $loac
+     * @return bool
+     */
+    private function getkey_boss($key, $loac = 3, $ids)
+    {
+        if ($loac >= 1) {
+            $splitKey = $this->split($key, $loac);//分割关键词
+            $res = $this->is_keylike_boss($splitKey['start'], $ids);//判断是否为like关键词
+            if (empty($res)) {
+                return $this->getkey_boss($key, $loac - 1, $ids);
+            } else {
+                return $res;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * 匹配是否为全索引关键词
+     * @param $key
+     * @return mixed
+     */
+    private function is_keyall_boss($key, $ids)
+    {
+
+        $res = Qkey_Boss::where('key', $key);
+        $res = $res->first();
+
+        return $res;
+    }
+
+    private function is_keylike_boss($key, $ids)
+    {
+        $res = Qkey_Boss::where('key', $key)->where('key', 'like', $key);
+        $res = $res->first();
+        return $res;
+    }
+
+    /**
+     * 判断是否包含官方标签 进行特殊逻辑输出
+     * @param $res
+     * @author Ehua(ehua999@163.com)
+     * @date 2021/1/16 12:22
+     */
+    public function authority_labe_boss($res)
+    {
+        switch ($res['labe']) {
+            case 'touwenjian'://偷文件
+
+                $arr = explode('-', $this->endKey);
+                T_getfile::get_file($arr[0], $this->qun, $arr[1]);
+                $str = '执行完毕';
+                $this->json = "$str|{$str}|{$str}|{$str}|EHUA ROT|信息分享|信息分享";
+                $this->str = $str;
+                $this->img = $str;
+                break;
+            case 'ququnliebiao'://取群列表
+
+                $RES = \QQROT\QQROT2::get_group_list();
+                $str = '';
+                foreach ($RES as $y => $k) {
+                    if ($k['id'] != '') {
+                        $str .= ($y + 1) . '-' . $k['name'] . "\n";
+                    }
+                }
+                $this->json = "$str|{$str}|{$str}|{$str}|EHUA ROT|信息分享|信息分享";
+                $this->str = $str;
+                $this->img = $str;
+                break;
+
+            case 'qunxinxi'://群信息
+
+
+                $RES = \QQROT\QQROT2::get_group_list();
+                $qunid = $RES[($this->endKey - 1)]['id'];
+                $qunnum = $RES[($this->endKey - 1)]['num'];
+                $owner = $RES[($this->endKey - 1)]['owner'];
+                $RES = \QQROT\QQROT2::get_group_info($qunid);
+
+                $str = "";
+                $str .= "群名称：" . $RES['name'];
+                $str .= "\n群号：" . $qunid;
+                $str .= "\n群类型：" . $RES['type'];
+                $str .= "\n群标签：" . @implode(',', $RES['tag']);
+                $str .= "\n群简介：" . $RES['desc'];
+                $str .= "\n群人数：" . $qunnum;
+                $str .= "\n群主Q：" . $owner;
+
+                $this->json = "$str|{$str}|{$str}|{$str}|EHUA ROT|信息分享|信息分享";
+                $this->str = $str;
+                $this->img = $str;
+                break;
+            case 'jiaqun'://加群
+
+                $qun = explode('-', $this->endKey)[0];
+                $msg = explode('-', $this->endKey)[1];
+                $res = \QQROT\QQROT2::add_group($qun, $msg);
+                $str = '已经申请';
+                $this->json = "$str|{$str}|{$str}|{$str}|EHUA ROT|信息分享|信息分享";
+                $this->str = $str;
+                $this->img = $str;
+                break;
+            default:
+                $this->json = $res['content'];
+                $this->str = $res['content'];
+                $this->img = $res['content'];
+                break;
+        }
+
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+//===================================================================================
+
     /**
      * 分割关键词
      * @param $key
@@ -410,7 +590,12 @@ class QQROT2
         return ['start' => $start, 'end' => $end];
     }
 
-    //没有关键词匹配到 返回
+    /**
+     * 没有关键词匹配到 返回
+     * @param string $str
+     * @author Ehua(ehua999@163.com)
+     * @date 2021/1/28 17:28
+     */
     private function put_error($str = 'ERROR')
     {
 //        response()->json(['code' => 200, 'msg' => '响应成功', 'type' => 'str', 'data' => $str]);
@@ -465,8 +650,14 @@ class QQROT2
 
     }
 
-
-    //请求接口操作
+    /**
+     * 请求接口操作
+     * @param $url
+     * @return mixed
+     * @throws GuzzleHttp\Exception\GuzzleException
+     * @author Ehua(ehua999@163.com)
+     * @date 2021/1/28 17:29
+     */
     private function checkUrl($url)
     {
         $client = new GuzzleHttp\Client();
@@ -479,7 +670,6 @@ class QQROT2
         return $arr;
     }
 
-    //请求接口操作
     private function checkUrl2($url)
     {
         preg_match("/[\w]+\.[\w][\w-]*\.(?:com\.cn|com|cn|co|net|org|gov|cc|biz|info)(|$)/isU", $url, $domain);
@@ -494,40 +684,4 @@ class QQROT2
         return $arr;
     }
 
-
-    function guzz($url = null, $field = null, $mothod = 'get', $header = null, $proxy = null, $outtime = 15)
-    {
-        if (is_array($field)) {
-            $type = 'form_params';
-        } else {
-            $field = json_decode($field);
-            $type = 'json';
-        }
-
-        $client = new GuzzleHttp\Client(); //初始化客户端
-
-        if ($mothod == 'get' || $mothod == 'GET') {
-            $response = $client->get($url, [
-                'query' => $field,
-                'header' => $header,
-                'timeout' => $outtime, //设置请求超时时间
-                'verify' => false,
-                'proxy' => $proxy,
-            ]);
-        } else {
-            $response = $client->request('POST', $url, [
-                $type => $field,
-                'header' => $header,
-                'timeout' => $outtime,
-                'verify' => false,
-                'proxy' => $proxy,
-            ]);
-        }
-
-        $body = $response->getBody(); //获取响应体，对象
-        $bodyStr = (string)$body; //对象转字串,这就是请求返回的结果
-
-        $bodyStr = trim($bodyStr, "\xEF\xBB\xBF");
-        return $bodyStr;
-    }
 }

@@ -76,15 +76,14 @@ class QQROT_CHECK2
             DB::table('log')->insert(['body' => '文件转发开始']);
 
             //查询群是否被监控
-            $res = DB::table('q_share')->where('from_qun', 'like', '%' . $qun . '%')->get(['to_qun', 'key', 'run_bot']);
+            $res = DB::table('q_share')->where('from_qun', 'like', '%' . $qun . '%')->get(['to_qun', 'file_cfg', 'run_bot']);
             $res = json_encode($res, 256);
             $res = json_decode($res, true);
             if (empty($res)) {
                 DB::table('log')->insert(['body' => 5555555, 'body2' => $qun]);
                 return false;
-            } else {
-                $res = $res[0];
             }
+
 
             preg_match("/\/.*-.*-.*-.*-.*,fileName/", $key, $requn);
             $fileId = trim(trim(str_replace("\/", '', $requn[0]), ',fileName'), '/');
@@ -92,11 +91,55 @@ class QQROT_CHECK2
             preg_match("/,fileName=.*?,fileSize/", $key, $requn);
             $fileName = trim(str_replace(",fileName=", '', $requn[0]), ',fileSize');
 
-            if (DB::table('q_share_log')->where('file_name', $fileName)->count() == 0) {
-                DB::table('q_share_log')->insert(['to' => $res['to_qun'], 'qun' => $qun, 'file_id' => $fileId, 'file_name' => $fileName, 'qq' => $qq]);
+            for ($i = 0; $i < count($res); $i++) {
 
-                \QQROT\QQROT2::group_file_to_group($qun, $res['to_qun'], $fileId);
+                $no=json_decode($res[$i]['file_cfg'],256);
+                if(!empty($no)){
+                    if(preg_match($no['no'],$fileName)){ continue; }
+                }
+
+                if (empty($res[$i]['join_qun'])) {
+                    $count = DB::table('q_share_log')->where('file_name', $fileName)->where('to_qun', $res[$i]['to_qun'])->count();
+                } else {
+                    $sql = "select count(*) from q_share_log where ";
+
+                    $to = $res[$i]['to_qun'];
+                    $sql = $sql . "file_name='$fileName' and (to_qun='$to'";
+                    $join_qun = $res[$i]['join_qun'];
+                    if (empty($join_qun)) {
+                        $sql = $sql . ')';
+                    } else {
+                        $sql = $sql . " or to_qun in ($join_qun) )";
+                    }
+                    $count = DB::select($sql);
+                    $count = json_encode($count, 256);
+                    $count = json_decode($count, true);
+                    $count = $count[0]['count(*)'];
+                }
+                if ($count == 0) {
+                    $r = \QQROT\QQROT2::group_file_to_group($qun, $res[$i]['to_qun'],$fileId);
+                    if ($r) {
+                        DB::table('q_share_log')->insert(['to_qun' => $res[$i]['to_qun'], 'qun' => $qun, 'file_id' => $fileId, 'file_name' => $fileName, 'qq' => $qq, 'intime' => date('Y-m-d H:i:s', time())]);
+                    }
+                }
+//
+//                if (empty($res[$i]['join_qun'])) {
+//                    $count = DB::table('q_share_log')->where('file_name', $fileName)->where('to_qun', $res[$i]['to_qun'])->count();
+//                } else {
+//                    $temp = DB::table('q_share_log');
+//                    $temp = $temp->where('file_name', $fileName)->where('to_qun', $res[$i]['to_qun']);
+//                    $join_qun=explode(',',$res[$i]['join_qun']);
+//                    for($i=0;$i<count($join_qun);$i++){
+//                        $temp = $temp->orwhere('to_qun', $res[$i]['join_qun']);
+//                    }
+//                    $count = $temp->count();
+//                }
+//                if ($count == 0) {
+//                    DB::table('q_share_log')->insert(['to_qun' => $res[$i]['to_qun'], 'qun' => $qun, 'file_id' => $fileId, 'file_name' => $fileName, 'qq' => $qq, 'intime' => date('Y-m-d H:i:s', time())]);
+//                    \QQROT\QQROT2::group_file_to_group($qun, $res[$i]['to_qun'], $fileId);
+//                }
             }
+
             if ($die == 'die') {
                 die;
             }
@@ -104,14 +147,18 @@ class QQROT_CHECK2
     }
 
     /**
-     * 信息采集监控
+     * csgo信息采集监控
      * @author Ehua(ehua999@163.com)
      * @date 2021/1/19 10:02
      */
     public static function monitoringMsg($key, $qun, $qq)
     {
+        $time_5 = date('Y-m-d H:i:s', time() - 600);
+        $time = date('Y-m-d H:i:s', time());
         if (preg_match("/([A-Z]|[0-9]){5}-([A-Z]|[0-9]){4}/", $key, $onlykey)) {
-            DB::table('made_csgo')->insert(['qun' => $qun, 'qq' => $qq, 'key' => $onlykey[0], 'intime' => date('Y-m-d H:i:s', time())]);
+            if (DB::table('made_csgo')->where(['key' => $onlykey[0]])->where('intime', '>', $time_5)->count() == 0) {
+                DB::table('made_csgo')->insert(['qun' => $qun, 'qq' => $qq, 'key' => $onlykey[0], 'intime' => $time]);
+            }
         }
 
     }
@@ -157,7 +204,7 @@ class QQROT_CHECK2
         $arr = json_decode($json, true);
         switch ($arr['type']) {
             case 'money':
-                //{"type":"money","data":{"num":"0.01","qun":"146971736","qq":"3135491919","run":{"packet_qq":"50%","packet_qun":"50%"},"no":{"msg":"转账¥1 自动进群(备注群号)"}}}
+                //{"type":"money","data":{"num":"30","qun":"146971736","qq":"3135491919","run":{"packet_qq":"50%","packet_qun":"50%"},"no":{"msg":"转账¥30 自动进群(备注群号)"}}}
                 $id = $data['message']['id'];
                 $money = $arr['data']['num'];
                 $reason = $arr['data']['no']['msg'];
@@ -171,18 +218,22 @@ class QQROT_CHECK2
                 }
                 break;
             case 'key':
-                //{"type":"key","data":{"num":"5","run":{},"no":{"msg":"邀请码无效"}}}
+                //{"type":"key","data":{"num":"10","run":{},"no":{"msg":"邀请码无效"}}}
                 $id = $data['message']['id'];
                 $num = $arr['data']['num'];
                 $reason = $arr['data']['no']['msg'];
-
-                if ($res = DB::table("q_auth_qun_add")->where(['qq' => $qq, 'qun' => $qun, 'status' => 1])->first()) {//已授权 自动通过进群
+                if (DB::table("q_auth_qun_add")->where(['qq' => $qq, 'qun' => $qun, 'status' => 1])->count() > 0) {//已授权 自动通过进群
+//                    DB::table('log2')->insert(['body'=>'1']);
                     $res = \QQROT\QQROT2::set_group_add_request($qun, $qq, $id, 1, 3, '');
+                    die;
                 } else {//未授权 拒绝
-                    if(!preg_match("/([A-Z]|[0-9])+/", $key, $requn)){
-                        $res = \QQROT\QQROT2::set_group_add_request($qun, $qq, $id, 2, 3, $reason);die;
-                    }else{
-                        $key=$requn[0];
+
+                    if (!preg_match("/([A-Z]|[0-9])+/", $key, $requn)) {
+//                        DB::table('log2')->insert(['body'=>'preg']);
+                        $res = \QQROT\QQROT2::set_group_add_request($qun, $qq, $id, 2, 3, $reason);
+                        die;
+                    } else {
+                        $key = $requn[0];
                     }
 
                     $db_keys = DB::table('q_auth_qun_key')->where(['key' => $key, 'status' => 1])->first();
@@ -190,16 +241,25 @@ class QQROT_CHECK2
                     $db_keys = json_decode($db_keys, true);
 
                     if (empty($db_keys)) {
+//                        DB::table('log2')->insert(['body'=>'empty($db_keys)']);
                         $res = \QQROT\QQROT2::set_group_add_request($qun, $qq, $id, 2, 3, $reason);
-                    }
-                    if($db_keys['use_num'] > $num){
-                        $res = \QQROT\QQROT2::set_group_add_request($qun, $qq, $id, 2, 3, '该邀请码使用次数过多');
+                        die;
                     }
 
-                    $newnum = $db_keys['use_num'] + 1;
-                    DB::table('q_auth_qun_key')->where(['key' => $key])->update(['use_num' => $newnum]);
-                    DB::table('q_auth_qun_add')->insert(['qq' => $qq, 'qun' => $qun, 'key' => $key, 'status' => 1, 'intime' => date('Y-m-d H:i:s', time())]);
-                    $res = \QQROT\QQROT2::set_group_add_request($qun, $qq, $id, 1, 3, '');
+                    if ($db_keys['use_num'] > $num) {
+//                        DB::table('log2')->insert(['body'=>'$db_keys[\'use_num\'] > $num']);
+
+                        $res = \QQROT\QQROT2::set_group_add_request($qun, $qq, $id, 2, 3, '该邀请码使用次数过多');
+                        die;
+                    } else {
+//                        DB::table('log2')->insert(['body'=>'ok']);
+                        $newnum = $db_keys['use_num'] + 1;
+                        DB::table('q_auth_qun_key')->where(['key' => $key])->update(['use_num' => $newnum]);
+                        DB::table('q_auth_qun_add')->insert(['qq' => $qq, 'qun' => $qun, 'key' => $key, 'status' => 1, 'intime' => date('Y-m-d H:i:s', time())]);
+                        $res = \QQROT\QQROT2::set_group_add_request($qun, $qq, $id, 1, 3, '');
+                    }
+
+
                 }
                 break;
         }
@@ -250,32 +310,32 @@ class QQROT_CHECK2
     }
 
 
-    /**
-     * 主人命令
-     * @param $key
-     * @param $quninfo
-     * @param $qun
-     * @param $qq
-     * @param $die
-     * @author Ehua(ehua999@163.com)
-     * @date 2021/1/22 10:00
-     */
-    public
-    static function boosCommand($key, $quninfo, $qun, $qq, $bossqq, $die)
-    {
-        if (!empty($quninfo)) {
-            return;
-        }
-        if ($qq != $bossqq) {
-            return;
-        }
-        switch ($key) {
-            case "开启群":
-                break;
-            case "关闭群";
-                break;
-        }
-    }
+//    /**
+//     * 主人命令
+//     * @param $key
+//     * @param $quninfo
+//     * @param $qun
+//     * @param $qq
+//     * @param $die
+//     * @author Ehua(ehua999@163.com)
+//     * @date 2021/1/22 10:00
+//     */
+//    public
+//    static function boosCommand($key, $quninfo, $qun, $qq, $bossqq, $die)
+//    {
+//        if (!empty($quninfo)) {
+//            return;
+//        }
+//        if ($qq != $bossqq) {
+//            return;
+//        }
+//        switch ($key) {
+//            case "开启群":
+//                break;
+//            case "关闭群";
+//                break;
+//        }
+//    }
 
 
 }
